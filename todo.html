@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List | Stufo</title>
+    <link rel="stylesheet" href="css/options.css">
+    <style>
+        .todo-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .todo-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .todo-form input, .todo-form select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .todo-form input {
+            flex: 1;
+        }
+        .todo-form button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .todo-list {
+            list-style: none;
+            padding: 0;
+        }
+        .todo-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .todo-item.completed {
+            background: #f8f9fa;
+            text-decoration: line-through;
+        }
+        .todo-text {
+            flex: 1;
+        }
+        .todo-subject {
+            font-size: 0.9em;
+            color: #666;
+            margin-left: 10px;
+        }
+        .todo-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .btn-small {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .btn-complete {
+            background: #28a745;
+            color: white;
+        }
+        .btn-edit {
+            background: #ffc107;
+            color: black;
+        }
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Todo List</h1>
+        <div class="todo-container">
+            <form class="todo-form" id="todoForm">
+                <input type="text" id="todoInput" placeholder="Enter a new task" required>
+                <select id="subjectSelect" required>
+                    <option value="">Select Subject</option>
+                    <option value="Maths">Maths</option>
+                    <option value="Biology">Biology</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Physics">Physics</option>
+                    <option value="Hindi">Hindi</option>
+                    <option value="English">English</option>
+                </select>
+                <button type="submit">Add Task</button>
+            </form>
+            <ul class="todo-list" id="todoList"></ul>
+        </div>
+        <button class="btn btn-back" onclick="window.location.href='focus.html'">← Back to Focus</button>
+    </div>
+
+    <script type="module">
+        const firebaseConfig = {
+          apiKey: "AIzaSyC9kTiwWg1HoOZoRFEiWVjLnmVEDskSidw",
+          authDomain: "stufo-34461.firebaseapp.com",
+          projectId: "stufo-34461",
+          storageBucket: "stufo-34461.firebasestorage.app",
+          messagingSenderId: "65118577418",
+          appId: "1:65118577418:web:d6ac5cc90d2a62789210f3"
+        };
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getFirestore, doc, setDoc, getDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        async function setFirebaseItem(key, value) {
+          await setDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key), { value });
+        }
+
+        async function getFirebaseItem(key) {
+          const docSnap = await getDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key));
+          return docSnap.exists() ? docSnap.data().value : null;
+        }
+
+        async function removeFirebaseItem(key) {
+          await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key));
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            let todos = [];
+
+            const todoForm = document.getElementById('todoForm');
+            const todoInput = document.getElementById('todoInput');
+            const subjectSelect = document.getElementById('subjectSelect');
+            const todoList = document.getElementById('todoList');
+
+            async function loadTodos() {
+                const data = await getFirebaseItem('todos');
+                if (data) {
+                    todos = JSON.parse(data);
+                }
+                renderTodos();
+            }
+
+            async function saveTodos() {
+                await setFirebaseItem('todos', JSON.stringify(todos));
+            }
+
+            function renderTodos() {
+                todoList.innerHTML = '';
+                todos.forEach((todo, index) => {
+                    const li = document.createElement('li');
+                    li.className = `todo-item ${todo.completed ? 'completed' : ''}`;
+                    li.innerHTML = `
+                        <span class="todo-text">${todo.task}</span>
+                        <span class="todo-subject">${todo.subject}</span>
+                        <div class="todo-actions">
+                            <button class="btn-small btn-complete" onclick="toggleComplete(${index})">${todo.completed ? 'Undo' : 'Complete'}</button>
+                            <button class="btn-small btn-edit" onclick="editTodo(${index})">Edit</button>
+                            <button class="btn-small btn-delete" onclick="deleteTodo(${index})">Delete</button>
+                        </div>
+                    `;
+                    todoList.appendChild(li);
+                });
+            }
+
+            window.toggleComplete = async function(index) {
+                todos[index].completed = !todos[index].completed;
+                await saveTodos();
+                renderTodos();
+            };
+
+            window.editTodo = function(index) {
+                const newTask = prompt('Edit task:', todos[index].task);
+                if (newTask && newTask.trim()) {
+                    todos[index].task = newTask.trim();
+                    saveTodos();
+                    renderTodos();
+                }
+            };
+
+            window.deleteTodo = async function(index) {
+                if (confirm('Delete this task?')) {
+                    todos.splice(index, 1);
+                    await saveTodos();
+                    renderTodos();
+                }
+            };
+
+            todoForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const task = todoInput.value.trim();
+                const subject = subjectSelect.value;
+                if (task && subject) {
+                    todos.push({
+                        task,
+                        subject,
+                        date: new Date().toLocaleDateString(),
+                        completed: false
+                    });
+                    await saveTodos();
+                    renderTodos();
+                    todoInput.value = '';
+                    subjectSelect.value = '';
+                }
+            });
+
+            await loadTodos();
+          } else {
+            window.location.href = 'signin.html';
+          }
+        });
+    </script>
+</body>
+</html></content>
+<parameter name="filePath">c:\Users\DELL\Desktop\stufo\todo.html

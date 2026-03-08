@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stopwatch</title>
+    <link rel="stylesheet" href="css/stopwatch.css">
+</head>
+<body>
+    <div class="container">
+        <h1>⏱️ Stopwatch</h1>
+        
+        <div class="stopwatch-display" id="display">00:00:00</div>
+        
+        <div class="controls">
+            <button class="btn btn-start" id="startBtn">Start</button>
+            <button class="btn btn-pause" id="pauseBtn" disabled>Pause</button>
+            <button class="btn btn-reset" id="resetBtn">Reset</button>
+        </div>
+        
+        <button class="btn btn-back" onclick="window.location.href='focus.html'">← Back to main</button>
+    </div>
+    
+    <script type="module">
+        const firebaseConfig = {
+          apiKey: "AIzaSyC9kTiwWg1HoOZoRFEiWVjLnmVEDskSidw",
+          authDomain: "stufo-34461.firebaseapp.com",
+          projectId: "stufo-34461",
+          storageBucket: "stufo-34461.firebasestorage.app",
+          messagingSenderId: "65118577418",
+          appId: "1:65118577418:web:d6ac5cc90d2a62789210f3"
+        };
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getFirestore, doc, setDoc, getDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        async function setFirebaseItem(key, value) {
+          await setDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key), { value });
+        }
+
+        async function getFirebaseItem(key) {
+          const docSnap = await getDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key));
+          return docSnap.exists() ? docSnap.data().value : null;
+        }
+
+        async function removeFirebaseItem(key) {
+          await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key));
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            (async () => {
+        let milliseconds = 0;
+        let seconds = 0;
+        let minutes = 0;
+        let hours = 0;
+        let isRunning = false;
+        let intervalId = null;
+        
+        const display = document.getElementById('display');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        
+        function updateDisplay() {
+            const h = String(hours).padStart(2, '0');
+            const m = String(minutes).padStart(2, '0');
+            const s = String(seconds).padStart(2, '0');
+            display.textContent = `${h}:${m}:${s}`;
+        }
+        
+        function start() {
+            if (!isRunning) {
+                isRunning = true;
+                startBtn.disabled = true;
+                pauseBtn.disabled = false;
+                
+                intervalId = setInterval(() => {
+                    milliseconds += 100;
+                    if (milliseconds >= 1000) {
+                        milliseconds = 0;
+                        seconds++;
+                    }
+                    if (seconds >= 60) {
+                        seconds = 0;
+                        minutes++;
+                    }
+                    if (minutes >= 60) {
+                        minutes = 0;
+                        hours++;
+                    }
+                    updateDisplay();
+                }, 100);
+            }
+        }
+        
+        async function pause() {
+            if (isRunning) {
+                isRunning = false;
+                clearInterval(intervalId);
+                startBtn.disabled = false;
+                pauseBtn.disabled = true;
+                
+                // Save session data when paused
+                await saveSessionData();
+            }
+        }
+        
+        function reset() {
+            clearInterval(intervalId);
+            isRunning = false;
+            milliseconds = 0;
+            seconds = 0;
+            minutes = 0;
+            hours = 0;
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            updateDisplay();
+        }
+        
+        startBtn.addEventListener('click', start);
+        pauseBtn.addEventListener('click', pause);
+        resetBtn.addEventListener('click', reset);
+        
+        updateDisplay();
+        
+        async function saveSessionData() {
+            if (seconds > 0 || minutes > 0 || hours > 0) {
+                const totalMinutes = hours * 60 + minutes + (seconds > 0 ? 1 : 0);
+                const subject = await getFirebaseItem('selectedSubject') || 'Not Specified';
+                const resultsKey = `results_Stopwatch`;
+                let results = [];
+                
+                const existingData = await getFirebaseItem(resultsKey);
+                if (existingData) {
+                    try {
+                        results = JSON.parse(existingData);
+                    } catch (e) {
+                        results = [];
+                    }
+                }
+                
+                results.push({
+                    duration: totalMinutes,
+                    subject: subject,
+                    date: new Date().toLocaleDateString(),
+                    time: new Date().toLocaleTimeString()
+                });
+                
+                await setFirebaseItem(resultsKey, JSON.stringify(results));
+            }
+        }
+        
+        startBtn.addEventListener('click', start);
+        pauseBtn.addEventListener('click', async () => { await pause(); });
+        resetBtn.addEventListener('click', reset);
+        
+        updateDisplay();
+            })();
+          } else {
+            window.location.href = 'signin.html';
+          }
+        });
+    </script>
+</body>
+</html>

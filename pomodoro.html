@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomodoro Technique</title>
+  <style>*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:'Segoe UI',sans-serif;
+}
+
+body{
+min-height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+color:#e6f7ff;
+padding:20px;
+}
+
+/* main card */
+
+.container{
+background:rgba(255,255,255,0.07);
+backdrop-filter:blur(12px);
+padding:40px;
+border-radius:16px;
+box-shadow:0 20px 40px rgba(0,0,0,0.5);
+border:1px solid rgba(255,255,255,0.15);
+text-align:center;
+min-width:320px;
+}
+
+/* title */
+
+h1{
+margin-bottom:20px;
+}
+
+/* phase indicator */
+
+.phase{
+font-size:14px;
+padding:6px 14px;
+border-radius:20px;
+display:inline-block;
+margin-bottom:20px;
+font-weight:bold;
+}
+
+.phase.work{
+background:#3ba7ff;
+color:white;
+}
+
+.phase.break{
+background:#38ef7d;
+color:#003d1f;
+}
+
+/* settings */
+
+.settings{
+display:flex;
+justify-content:center;
+gap:20px;
+margin-bottom:20px;
+flex-wrap:wrap;
+}
+
+.setting-group{
+display:flex;
+flex-direction:column;
+align-items:center;
+}
+
+.setting-group label{
+font-size:13px;
+margin-bottom:5px;
+color:#bcdde8;
+}
+
+.setting-group input{
+width:70px;
+padding:8px;
+border-radius:6px;
+border:none;
+text-align:center;
+font-size:16px;
+background:rgba(255,255,255,0.15);
+color:white;
+}
+
+/* timer */
+
+.pomodoro-display{
+font-size:48px;
+font-weight:bold;
+margin:25px 0;
+font-family:'Courier New',monospace;
+letter-spacing:2px;
+color:#7fd7ff;
+}
+
+/* buttons */
+
+.controls{
+display:flex;
+gap:15px;
+justify-content:center;
+flex-wrap:wrap;
+}
+
+.btn{
+padding:12px 25px;
+border:none;
+border-radius:8px;
+font-size:15px;
+font-weight:bold;
+cursor:pointer;
+transition:0.2s;
+}
+
+.btn:hover{
+transform:translateY(-2px);
+box-shadow:0 5px 15px rgba(0,0,0,0.4);
+}
+
+.btn-start{
+background:#38ef7d;
+color:#003d1f;
+}
+
+.btn-pause{
+background:#f5576c;
+color:white;
+}
+
+.btn-reset{
+background:#7a8cff;
+color:white;
+}
+
+.btn-back{
+margin-top:25px;
+background:#777;
+color:white;
+display:inline-block;
+}
+
+.btn:disabled{
+opacity:0.6;
+cursor:not-allowed;
+}</style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍅 Pomodoro Technique</h1>
+        <div class="phase work" id="phase">Work Session</div>
+        
+        <div class="settings">
+            <div class="setting-group">
+                <label for="workMinutes">Work (min)</label>
+                <input type="number" id="workMinutes" min="1" max="60" value="25">
+            </div>
+            <div class="setting-group">
+                <label for="breakMinutes">Break (min)</label>
+                <input type="number" id="breakMinutes" min="1" max="60" value="5">
+            </div>
+        </div>
+        
+        <div class="pomodoro-display" id="display">25:00</div>
+        
+        <div class="controls">
+            <button class="btn btn-start" id="startBtn">Start</button>
+            <button class="btn btn-pause" id="pauseBtn" disabled>Pause</button>
+            <button class="btn btn-reset" id="resetBtn">Reset</button>
+        </div>
+        
+        <button class="btn btn-back" onclick="window.location.href='focus.html'">← Back to main</button>
+    </div>
+    
+    <script type="module">
+        const firebaseConfig = {
+          apiKey: "AIzaSyC9kTiwWg1HoOZoRFEiWVjLnmVEDskSidw",
+          authDomain: "stufo-34461.firebaseapp.com",
+          projectId: "stufo-34461",
+          storageBucket: "stufo-34461.firebasestorage.app",
+          messagingSenderId: "65118577418",
+          appId: "1:65118577418:web:d6ac5cc90d2a62789210f3"
+        };
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getFirestore, doc, setDoc, getDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        async function setFirebaseItem(key, value) {
+          await setDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key), { value });
+        }
+
+        async function getFirebaseItem(key) {
+          const docSnap = await getDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key));
+          return docSnap.exists() ? docSnap.data().value : null;
+        }
+
+        async function removeFirebaseItem(key) {
+          await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key));
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            (async () => {
+        let isWorkSession = true;
+        let isRunning = false;
+        let remainingSeconds = 0;
+        let totalSeconds = 0;
+        let intervalId = null;
+        
+        const display = document.getElementById('display');
+        const phaseDisplay = document.getElementById('phase');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const workMinutesInput = document.getElementById('workMinutes');
+        const breakMinutesInput = document.getElementById('breakMinutes');
+        
+        function updateDisplay() {
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            
+            const m = String(minutes).padStart(2, '0');
+            const s = String(seconds).padStart(2, '0');
+            display.textContent = `${m}:${s}`;
+        }
+        
+        function startSession() {
+            const workMinutes = parseInt(workMinutesInput.value) || 25;
+            const breakMinutes = parseInt(breakMinutesInput.value) || 5;
+            
+            totalSeconds = isWorkSession ? workMinutes * 60 : breakMinutes * 60;
+            remainingSeconds = totalSeconds;
+            updateDisplay();
+        }
+        
+        function switchPhase() {
+            isWorkSession = !isWorkSession;
+            if (isWorkSession) {
+                phaseDisplay.textContent = 'Work Session';
+                phaseDisplay.classList.remove('break');
+                phaseDisplay.classList.add('work');
+            } else {
+                phaseDisplay.textContent = 'Break Time';
+                phaseDisplay.classList.remove('work');
+                phaseDisplay.classList.add('break');
+            }
+            startSession();
+        }
+        
+        function start() {
+            if (!isRunning) {
+                if (remainingSeconds === 0) {
+                    startSession();
+                }
+                
+                isRunning = true;
+                startBtn.disabled = true;
+                pauseBtn.disabled = false;
+                workMinutesInput.disabled = true;
+                breakMinutesInput.disabled = true;
+                
+                intervalId = setInterval(() => {
+                    remainingSeconds--;
+                    updateDisplay();
+                    
+                    if (remainingSeconds <= 0) {
+                        clearInterval(intervalId);
+                        isRunning = false;
+                        startBtn.disabled = false;
+                        pauseBtn.disabled = true;
+                        
+                        if (isWorkSession) {
+                            saveSessionData(totalSeconds / 60);
+                        }
+                        
+                        alert(`${isWorkSession ? 'Work' : 'Break'} session completed!`);
+                        switchPhase();
+                    }
+                }, 1000);
+            }
+        }
+        
+        function pause() {
+            if (isRunning) {
+                isRunning = false;
+                clearInterval(intervalId);
+                startBtn.disabled = false;
+                pauseBtn.disabled = true;
+            }
+        }
+        
+        function reset() {
+            clearInterval(intervalId);
+            isRunning = false;
+            isWorkSession = true;
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            workMinutesInput.disabled = false;
+            breakMinutesInput.disabled = false;
+            phaseDisplay.textContent = 'Work Session';
+            phaseDisplay.classList.remove('break');
+            phaseDisplay.classList.add('work');
+            startSession();
+        }
+        
+        startBtn.addEventListener('click', start);
+        pauseBtn.addEventListener('click', pause);
+        resetBtn.addEventListener('click', reset);
+        
+        // Initialize display
+        startSession();
+        
+        async function saveSessionData(duration) {
+            const subject = await getFirebaseItem('selectedSubject') || 'Not Specified';
+            const resultsKey = `results_Pomodoro Technique`;
+            let results = [];
+            
+            const existingData = await getFirebaseItem(resultsKey);
+            if (existingData) {
+                try {
+                    results = JSON.parse(existingData);
+                } catch (e) {
+                    results = [];
+                }
+            }
+            
+            results.push({
+                duration: Math.round(duration),
+                subject: subject,
+                date: new Date().toLocaleDateString(),
+                time: new Date().toLocaleTimeString()
+            });
+            
+            await setFirebaseItem(resultsKey, JSON.stringify(results));
+        }
+            })();
+          } else {
+            window.location.href = 'signin.html';
+          }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Option</title>
+<link rel="stylesheet" href="css/options.css">
+</head>
+<body>
+    <div class="container">
+        <h1 id="mainHeading">Welcome!</h1>
+            <h3 id="currentTaskDisplay">Loading task...</h3>
+        <div class="subtitle">Start your study session!</div>
+       
+        
+        <div class="mcq-buttons-grid" id="mcqContainer">
+            <div class="mcq-button-wrapper">
+                <button class="mcq-button" data-id="1">
+                    <span class="mcq-button-label">
+                        <span>Stopwatch</span>
+                        <button class="rename-btn" title="Rename">✎</button>
+                    </span>
+                </button>
+                <button class="result-btn" title="See Results">📊 Results</button>
+            </div>
+            <div class="mcq-button-wrapper">
+                <button class="mcq-button" data-id="2">
+                    <span class="mcq-button-label">
+                        <span>Timer</span>
+                        <button class="rename-btn" title="Rename">✎</button>
+                    </span>
+                </button>
+                <button class="result-btn" title="See Results">📊 Results</button>
+            </div>
+            <div class="mcq-button-wrapper">
+                <button class="mcq-button" data-id="3">
+                    <span class="mcq-button-label">
+                        <span>Pomodoro Technique</span>
+                        <button class="rename-btn" title="Rename">✎</button>
+                    </span>
+                </button>
+                <button class="result-btn" title="See Results">📊 Results</button>
+            </div>
+        </div>
+        
+        <div class="button-controls">
+            <button class="btn btn-save" id="saveOptions">Save Preferences</button>
+            <button class="btn btn-reset" id="resetBtn">Reset to Default</button>
+            <button class="btn btn-back" onclick="window.location.href='index.html'">← Back to Home</button>
+            <button class="btn btn-manage" onclick="window.location.href='todo.html'">Manage Tasks</button>
+        </div>
+    </div>
+
+
+    <script type="module">
+        const firebaseConfig = {
+          apiKey: "AIzaSyC9kTiwWg1HoOZoRFEiWVjLnmVEDskSidw",
+          authDomain: "stufo-34461.firebaseapp.com",
+          projectId: "stufo-34461",
+          storageBucket: "stufo-34461.firebasestorage.app",
+          messagingSenderId: "65118577418",
+          appId: "1:65118577418:web:d6ac5cc90d2a62789210f3"
+        };
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getFirestore, doc, setDoc, getDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        async function setFirebaseItem(key, value) {
+          await setDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key), { value });
+        }
+
+        async function getFirebaseItem(key) {
+          const docSnap = await getDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key));
+          return docSnap.exists() ? docSnap.data().value : null;
+        }
+
+        async function removeFirebaseItem(key) {
+          await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key));
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            (async () => {
+        const loadTask = async function() {
+  // Load current task from todos
+  const todosData = await getFirebaseItem('todos');
+  let currentTask = 'No tasks available';
+  if (todosData) {
+    const todos = JSON.parse(todosData);
+    const pendingTodo = todos.find(todo => !todo.completed);
+    if (pendingTodo) {
+      currentTask = `${pendingTodo.task} (${pendingTodo.subject})`;
+    }
+  }
+  document.getElementById("currentTaskDisplay").textContent = currentTask;
+};
+
+if (document.readyState === 'loading') {
+    window.addEventListener('load', loadTask);
+} else {
+    loadTask();
+}
+
+         let userName = 'Student';
+        const user = auth.currentUser;
+        if (user) {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            userName = userDoc.data().name;
+          }
+        }
+
+    document.getElementById("mainHeading").innerText =
+        "Welcome, " + userName + "!";
+        
+        let mcqCounter = 4;
+        
+        function enableRenaming(button) {
+            const label = button.querySelector('.mcq-button-label span');
+            const originalText = label.textContent;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'edit-input';
+            input.value = originalText;
+            
+            label.replaceWith(input);
+            input.focus();
+            input.select();
+            
+            const saveRename = () => {
+                const newText = input.value.trim() || originalText;
+                const newLabel = document.createElement('span');
+                newLabel.textContent = newText;
+                input.replaceWith(newLabel);
+            };
+            
+            input.addEventListener('blur', saveRename);
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') saveRename();
+            });
+        }
+        
+        function attachRenameListener(button) {
+            const renameBtn = button.querySelector('.rename-btn');
+            if (renameBtn) {
+                renameBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    enableRenaming(button);
+                });
+            }
+        }
+        
+        function attachResultListener(resultBtn) {
+            resultBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    const wrapper = resultBtn.parentElement;
+                    const mcqButton = wrapper.querySelector('.mcq-button');
+                    const buttonName = mcqButton.querySelector('.mcq-button-label span:first-child').textContent.trim();
+                    console.log('Navigating to results for:', buttonName);
+                    window.location.href = 'data.html?set=' + encodeURIComponent(buttonName);
+                } catch (error) {
+                    console.error('Error in result button click:', error);
+                }
+            });
+        }
+        
+        function addMCQButton(name = null) {
+            mcqCounter++;
+            const buttonName = name || `MCQ Set ${mcqCounter}`;
+            
+            const wrapper = document.createElement('div');
+            wrapper.className = 'mcq-button-wrapper';
+            
+            const button = document.createElement('button');
+            button.className = 'mcq-button';
+            button.setAttribute('data-id', mcqCounter);
+            button.innerHTML = `
+                <span class="mcq-button-label">
+                    <span>${buttonName}</span>
+                    <button class="rename-btn" title="Rename">✎</button>
+                </span>
+            `;
+            
+            const resultBtn = document.createElement('button');
+            resultBtn.className = 'result-btn';
+            resultBtn.title = 'See Results';
+            resultBtn.textContent = '📊 Results';
+            
+            button.addEventListener('click', (e) => {
+                if (e.target.className !== 'rename-btn' && !e.target.classList.contains('rename-btn') && !e.target.classList.contains('result-btn')) {
+                    const buttonName = button.querySelector('.mcq-button-label span:first-child').textContent.trim();
+                    if (buttonName === 'Stopwatch') {
+                        window.location.href = 'stopwatch.html';
+                    } else if (buttonName === 'Timer') {
+                        window.location.href = 'Timer.html';
+                    } else if (buttonName === 'Pomodoro Technique') {
+                        window.location.href = 'Pomodoro.html';
+                    } else {
+                        alert(`You selected: ${buttonName}`);
+                    }
+                }
+            });
+            
+            attachRenameListener(button);
+            attachResultListener(resultBtn);
+            wrapper.appendChild(button);
+            wrapper.appendChild(resultBtn);
+            document.getElementById('mcqContainer').appendChild(wrapper);
+        }
+        
+        // Initialize existing buttons
+        function initializeButtons() {
+            document.querySelectorAll('.mcq-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    if (e.target.className !== 'rename-btn' && !e.target.classList.contains('rename-btn')) {
+                        const buttonName = button.querySelector('.mcq-button-label span:first-child').textContent.trim();
+                        if (buttonName === 'Stopwatch') {
+                            window.location.href = 'stopwatch.html';
+                        } else if (buttonName === 'Timer') {
+                            window.location.href = 'timer.html';
+                        } else if (buttonName === 'Pomodoro Technique') {
+                            window.location.href = 'pomodoro.html';
+                        } else {
+                            alert(`You selected: ${buttonName}`);
+                        }
+                    }
+                });
+                attachRenameListener(button);
+            });
+            
+            // Attach result listeners to result buttons
+            document.querySelectorAll('.result-btn').forEach(resultBtn => {
+                attachResultListener(resultBtn);
+            });
+        }
+        
+        // Initialize on DOM ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeButtons);
+        } else {
+            initializeButtons();
+        }
+        
+        // Save functionality
+        document.getElementById('saveOptions').addEventListener('click', async () => {
+            const buttons = document.querySelectorAll('.mcq-button');
+            const data = Array.from(buttons).map(btn => ({
+                id: btn.getAttribute('data-id'),
+                name: btn.querySelector('.mcq-button-label span:first-child').textContent
+            }));
+            await setFirebaseItem('mcqData', JSON.stringify(data));
+            alert('Preferences saved!');
+        });
+        
+        // Reset functionality
+        document.getElementById('resetBtn').addEventListener('click', async () => {
+            if (confirm('Reset to default MCQ sets?')) {
+                await removeFirebaseItem('mcqData');
+                location.reload();
+            }
+        });
+        
+        // Load saved data
+        const loadMcqData = async () => {
+            const saved = await getFirebaseItem('mcqData');
+            if (saved) {
+                const data = JSON.parse(saved);
+                document.getElementById('mcqContainer').innerHTML = '';
+                mcqCounter = 0;
+                data.forEach(item => {
+                    addMCQButton(item.name);
+                });
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            window.addEventListener('load', loadMcqData);
+        } else {
+            loadMcqData();
+        }
+            })();
+          } else {
+            window.location.href = 'signin.html';
+          }
+        });
+
+    </script>
+</body>
+</html>

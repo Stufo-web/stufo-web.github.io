@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results & Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="css/data.css">
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Results & Analysis</h1>
+        <p class="subtitle" id="setName">Loading results...</p>
+        
+        <!-- Quick Stats -->
+        <div class="stats-grid" id="statsContainer">
+            <div class="stat-card">
+                <h3>Total Sessions</h3>
+                <div class="stat-value">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Time</h3>
+                <div class="stat-value">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Avg per Session</h3>
+                <div class="stat-value">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Longest Session</h3>
+                <div class="stat-value">-</div>
+            </div>
+        </div>
+        
+        <!-- Analysis Section -->
+        <div class="analysis-section" id="analysisSection">
+            <!-- Chart -->
+            <h2>📈 Session Duration Trend</h2>
+            <div class="chart-container">
+                <canvas id="durationChart"></canvas>
+            </div>
+            
+            <!-- Subject-wise Analysis -->
+            <h2 style="margin-top: 40px;">📚 Subject-wise Analysis</h2>
+            <div class="subject-chart-container">
+                <canvas id="subjectChart"></canvas>
+            </div>
+            
+            <!-- Subject Statistics -->
+            <div class="subject-stats">
+                <h3 style="color: #333; margin-bottom: 15px;">Subject Breakdown</h3>
+                <div class="subject-stats-grid" id="subjectStatsContainer">
+                    <!-- Subject cards will be populated here -->
+                </div>
+            </div>
+            
+            <!-- Insights -->
+            <h2 style="margin-top: 40px;">💡 Key Insights</h2>
+            <div class="insights-grid" id="insightsContainer">
+                <!-- Insights will be populated here -->
+            </div>
+            
+            <!-- Session History -->
+            <h2 style="margin-top: 40px;">📝 Session History</h2>
+            <div class="session-history" id="sessionHistory">
+                <!-- Sessions will be populated here -->
+            </div>
+        </div>
+        
+        <a href="focus.html" class="back-btn">← Back to Focus</a>
+        <button class="clear-data-btn" onclick="clearData()">Clear All Data</button>
+    </div>
+
+    <div class="todos-section" style="margin-top: 40px; padding: 20px; border-top: 1px solid #ddd;">
+        <h2>Your Todos</h2>
+        <div id="todosContainer"></div>
+    </div>
+    
+    <style>
+        .todos-section ul {
+            list-style-type: disc;
+            margin-left: 20px;
+        }
+        .todos-section li.completed {
+            text-decoration: line-through;
+            color: #888;
+        }
+    </style>
+    
+    <script type="module">
+        const firebaseConfig = {
+          apiKey: "AIzaSyC9kTiwWg1HoOZoRFEiWVjLnmVEDskSidw",
+          authDomain: "stufo-34461.firebaseapp.com",
+          projectId: "stufo-34461",
+          storageBucket: "stufo-34461.firebasestorage.app",
+          messagingSenderId: "65118577418",
+          appId: "1:65118577418:web:d6ac5cc90d2a62789210f3"
+        };
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getFirestore, doc, setDoc, getDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        async function setFirebaseItem(key, value) {
+          await setDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key), { value });
+        }
+
+        async function getFirebaseItem(key) {
+          const docSnap = await getDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key));
+          return docSnap.exists() ? docSnap.data().value : null;
+        }
+
+        async function removeFirebaseItem(key) {
+          await deleteDoc(doc(db, 'users', auth.currentUser.uid, 'storage', key));
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            (async () => {
+        let durationChart = null;
+        let subjectChart = null;
+        const urlParams = new URLSearchParams(window.location.search);
+        const setName = urlParams.get('set') || 'Unknown Set';
+        
+        document.getElementById('setName').textContent = `Results for: ${setName}`;
+        
+        async function loadResults() {
+            const resultsData = await getFirebaseItem(`results_${setName}`);
+            
+            if (resultsData) {
+                try {
+                    const results = JSON.parse(resultsData);
+                    if (results.length > 0) {
+                        displayStats(results);
+                        displayChart(results);
+                        displaySubjectAnalysis(results);
+                        displayInsights(results);
+                        displaySessionHistory(results);
+                    } else {
+                        showNoData();
+                    }
+                } catch (e) {
+                    showNoData();
+                }
+            } else {
+                showNoData();
+            }
+        }
+        
+        function displayStats(results) {
+            const stats = calculateStats(results);
+            const statsCards = document.querySelectorAll('.stat-card');
+            
+            statsCards[0].querySelector('.stat-value').textContent = stats.totalSessions;
+            statsCards[1].querySelector('.stat-value').textContent = stats.totalTime;
+            statsCards[2].querySelector('.stat-value').textContent = stats.averageTime + ' min';
+            statsCards[3].querySelector('.stat-value').textContent = stats.longestSession + ' min';
+        }
+        
+        function calculateStats(results) {
+            const totalSessions = results.length;
+            let totalMinutes = 0;
+            let maxDuration = 0;
+            
+            results.forEach(session => {
+                const duration = session.duration || 0;
+                totalMinutes += duration;
+                maxDuration = Math.max(maxDuration, duration);
+            });
+            
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            const averageTime = totalSessions > 0 ? Math.round(totalMinutes / totalSessions) : 0;
+            
+            return {
+                totalSessions: totalSessions,
+                totalTime: `${hours}h ${minutes}m`,
+                averageTime: averageTime,
+                longestSession: maxDuration,
+                totalMinutes: totalMinutes
+            };
+        }
+        
+        function displayChart(results) {
+            const ctx = document.getElementById('durationChart').getContext('2d');
+            const labels = results.map((_, i) => `Session ${i + 1}`);
+            const durations = results.map(r => r.duration || 0);
+            
+            if (durationChart) {
+                durationChart.destroy();
+            }
+            
+            durationChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Duration (minutes)',
+                        data: durations,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#667eea',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                font: { size: 12 }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Minutes' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function displaySubjectAnalysis(results) {
+            const subjectData = calculateSubjectStats(results);
+            displaySubjectChart(subjectData);
+            displaySubjectStats(subjectData);
+        }
+        
+        function calculateSubjectStats(results) {
+            const subjectMap = {};
+            
+            results.forEach(session => {
+                const subject = session.subject || 'Not Specified';
+                if (!subjectMap[subject]) {
+                    subjectMap[subject] = {
+                        name: subject,
+                        totalTime: 0,
+                        sessions: 0,
+                        maxSession: 0
+                    };
+                }
+                const duration = session.duration || 0;
+                subjectMap[subject].totalTime += duration;
+                subjectMap[subject].sessions += 1;
+                subjectMap[subject].maxSession = Math.max(subjectMap[subject].maxSession, duration);
+            });
+            
+            return Object.values(subjectMap);
+        }
+        
+        function displaySubjectChart(subjectData) {
+            const ctx = document.getElementById('subjectChart').getContext('2d');
+            const labels = subjectData.map(s => s.name);
+            const data = subjectData.map(s => s.totalTime);
+            const colors = [
+                '#667eea', '#764ba2', '#f5576c', '#f093fb', '#11998e', '#38ef7d'
+            ];
+            
+            if (subjectChart) {
+                subjectChart.destroy();
+            }
+            
+            subjectChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                font: { size: 12 },
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    return label + ': ' + value + ' minutes';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function displaySubjectStats(subjectData) {
+            const container = document.getElementById('subjectStatsContainer');
+            
+            const totalTime = subjectData.reduce((sum, s) => sum + s.totalTime, 0);
+            
+            const statsHTML = subjectData.map(subject => {
+                const percentage = totalTime > 0 ? Math.round((subject.totalTime / totalTime) * 100) : 0;
+                const avgTime = Math.round(subject.totalTime / subject.sessions);
+                
+                return `
+                    <div class="subject-card">
+                        <h4>${subject.name}</h4>
+                        <div class="subject-stat">
+                            <span>Total Time:</span>
+                            <span class="subject-stat-value">${subject.totalTime} min</span>
+                        </div>
+                        <div class="subject-stat">
+                            <span>Sessions:</span>
+                            <span class="subject-stat-value">${subject.sessions}</span>
+                        </div>
+                        <div class="subject-stat">
+                            <span>Average:</span>
+                            <span class="subject-stat-value">${avgTime} min</span>
+                        </div>
+                        <div class="subject-stat">
+                            <span>Longest:</span>
+                            <span class="subject-stat-value">${subject.maxSession} min</span>
+                        </div>
+                        <div class="subject-stat" style="margin-top: 8px; border-top: 2px solid #667eea; padding-top: 8px;">
+                            <span>Percentage:</span>
+                            <span class="subject-stat-value">${percentage}%</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = statsHTML;
+        }
+        
+        function displayInsights(results) {
+            const stats = calculateStats(results);
+            const insights = generateInsights(results, stats);
+            const container = document.getElementById('insightsContainer');
+            
+            container.innerHTML = insights.map(insight => `
+                <div class="insight-card">
+                    <h4>${insight.title}</h4>
+                    <p>${insight.description}</p>
+                </div>
+            `).join('');
+        }
+        
+        function generateInsights(results, stats) {
+            const insights = [];
+            const durations = results.map(r => r.duration || 0);
+            const avgDuration = stats.averageTime;
+            const recentAvg = durations.slice(-5).reduce((a, b) => a + b, 0) / Math.min(5, durations.length);
+            
+            // Insight 1: Consistency
+            const variance = calculateVariance(durations);
+            if (variance < 50) {
+                insights.push({
+                    title: '✅ Excellent Consistency',
+                    description: 'Your study sessions are very consistent. Keep maintaining this stable routine!'
+                });
+            } else if (variance < 100) {
+                insights.push({
+                    title: '👍 Good Consistency',
+                    description: 'Your session durations are reasonably consistent. You\'re doing well!'
+                });
+            } else {
+                insights.push({
+                    title: '📊 Variable Sessions',
+                    description: 'Your session durations vary quite a bit. Try to maintain more consistent study periods.'
+                });
+            }
+            
+            // Insight 2: Trend
+            if (recentAvg > avgDuration) {
+                insights.push({
+                    title: '📈 Improving Trend',
+                    description: 'Great! Your recent sessions are longer than your average. You\'re getting more focused!'
+                });
+            } else if (recentAvg < avgDuration * 0.8) {
+                insights.push({
+                    title: '📉 Declining Trend',
+                    description: 'Your recent sessions are shorter. Try to increase your study duration again.'
+                });
+            } else {
+                insights.push({
+                    title: '➡️ Stable Performance',
+                    description: 'Your recent sessions match your average. Keep up the consistent effort!'
+                });
+            }
+            
+            // Insight 3: Productivity
+            if (stats.totalSessions >= 10) {
+                insights.push({
+                    title: '🎯 High Dedication',
+                    description: `You've completed ${stats.totalSessions} sessions! You're highly committed to learning.`
+                });
+            } else if (stats.totalSessions >= 5) {
+                insights.push({
+                    title: '💪 Good Commitment',
+                    description: `You've completed ${stats.totalSessions} sessions. Keep building this habit!`
+                });
+            } else {
+                insights.push({
+                    title: '🚀 Getting Started',
+                    description: `You've completed ${stats.totalSessions} sessions. Build this habit with regular study!`
+                });
+            }
+            
+            // Insight 4: Performance Rating
+            const avgScore = stats.averageTime;
+            if (avgScore >= 60) {
+                insights.push({
+                    title: '⭐ Excellent Duration',
+                    description: 'Your average session length is excellent. You\'re maintaining focus very well!'
+                });
+            } else if (avgScore >= 30) {
+                insights.push({
+                    title: '⭐ Good Duration',
+                    description: 'Your average session is good. Consider extending it for even better results.'
+                });
+            } else {
+                insights.push({
+                    title: '⭐ Building Focus',
+                    description: 'Your sessions are short. Try to gradually increase your focus duration.'
+                });
+            }
+            
+            return insights;
+        }
+        
+        function calculateVariance(values) {
+            if (values.length === 0) return 0;
+            const avg = values.reduce((a, b) => a + b, 0) / values.length;
+            const squaredDiffs = values.map(v => Math.pow(v - avg, 2));
+            return Math.sqrt(squaredDiffs.reduce((a, b) => a + b, 0) / values.length);
+        }
+        
+        function displaySessionHistory(results) {
+            const container = document.getElementById('sessionHistory');
+            
+            const sessionsHTML = results.map((session, index) => {
+                const duration = session.duration || 0;
+                const date = session.date || new Date().toLocaleDateString();
+                let badge = 'average';
+                let badgeText = 'Average';
+                
+                if (duration >= 60) {
+                    badge = 'excellent';
+                    badgeText = 'Excellent';
+                } else if (duration >= 45) {
+                    badge = 'good';
+                    badgeText = 'Good';
+                } else if (duration >= 30) {
+                    badge = 'average';
+                    badgeText = 'Average';
+                } else {
+                    badge = 'needs-improvement';
+                    badgeText = 'Short';
+                }
+                
+                return `
+                    <div class="session-item">
+                        <div>
+                            <div class="session-time">Session ${index + 1}</div>
+                            <div class="session-date">${date}</div>
+                        </div>
+                        <div style="display: flex; gap: 15px; align-items: center;">
+                            <span>${duration} minutes</span>
+                            <span class="performance-badge ${badge}">${badgeText}</span>
+                        </div>
+                    </div>
+                `;
+            }).reverse().join('');
+            
+            container.innerHTML = sessionsHTML;
+        }
+        
+        function showNoData() {
+            const analysisSection = document.getElementById('analysisSection');
+            analysisSection.innerHTML = '<div class="no-data">No data available yet. Complete a session in ' + setName + ' to see detailed analysis.</div>';
+            
+            document.querySelectorAll('.stat-card').forEach(card => {
+                card.querySelector('.stat-value').textContent = '-';
+            });
+        }
+        
+        async function clearData() {
+            if (confirm('Are you sure you want to clear all data for ' + setName + '? This cannot be undone.')) {
+                await removeFirebaseItem(`results_${setName}`);
+                location.reload();
+            }
+        }
+        
+        // Load results when page loads
+        await loadResults();
+
+        // Load and display todos
+        async function loadTodos() {
+            const todosData = await getFirebaseItem('todos');
+            const todosContainer = document.getElementById('todosContainer');
+            if (todosData) {
+                const todos = JSON.parse(todosData);
+                if (todos.length > 0) {
+                    const groupedTodos = {};
+                    todos.forEach(todo => {
+                        if (!groupedTodos[todo.subject]) {
+                            groupedTodos[todo.subject] = [];
+                        }
+                        groupedTodos[todo.subject].push(todo);
+                    });
+
+                    let html = '';
+                    for (const subject in groupedTodos) {
+                        html += `<h3>${subject}</h3><ul>`;
+                        groupedTodos[subject].forEach(todo => {
+                            html += `<li class="${todo.completed ? 'completed' : ''}">${todo.task} (${todo.date})</li>`;
+                        });
+                        html += '</ul>';
+                    }
+                    todosContainer.innerHTML = html;
+                } else {
+                    todosContainer.innerHTML = '<p>No todos found.</p>';
+                }
+            } else {
+                todosContainer.innerHTML = '<p>No todos found.</p>';
+            }
+        }
+
+        await loadTodos();
+            })();
+          } else {
+            window.location.href = 'signin.html';
+          }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="css/signin.css" class="css">
+<body>
+    <main>
+      <div class="page">
+    <div class="card">
+      <h1>Sign In</h1>
+      <p>Welcome back to Stufo</p>
+
+      <form id="signinForm">
+        <input type="email" id="email" placeholder="Email"  required>
+        <br>
+        <br>
+        <input type="password" id="password" placeholder="Password" required>
+<br>
+<br>
+        <button type="submit" class="sig">Sign In</button>
+      </form>
+
+      <span class="link">Don’t have an account? <a href="signup.html">Sign up</a></span>
+    </div>
+  </div>
+  </main>
+  
+  <script type="module">
+    const firebaseConfig = {
+      apiKey: "AIzaSyC9kTiwWg1HoOZoRFEiWVjLnmVEDskSidw",
+      authDomain: "stufo-34461.firebaseapp.com",
+      projectId: "stufo-34461",
+      storageBucket: "stufo-34461.firebasestorage.app",
+      messagingSenderId: "65118577418",
+      appId: "1:65118577418:web:d6ac5cc90d2a62789210f3"
+    };
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    document.getElementById('signinForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        alert('Signed in successfully!');
+        window.location.href = 'focus.html';
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    });
+  </script>
+</body></html>
