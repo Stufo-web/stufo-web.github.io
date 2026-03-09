@@ -159,30 +159,30 @@
             statsCards[3].querySelector('.stat-value').textContent = stats.longestSession + ' min';
         }
         
-      function calculateSubjectStats(results) {
-    const subjectMap = {};
-    // Get the subject name from the setName parameter (which contains the task subject)
-    const setName = new URLSearchParams(window.location.search).get('set') || 'Unknown Set';
-    
-    results.forEach(session => {
-        // Use session.subject if available, otherwise use setName as fallback
-        const subject = session.subject || setName;
-        if (!subjectMap[subject]) {
-            subjectMap[subject] = {
-                name: subject,
-                totalTime: 0,
-                sessions: 0,
-                maxSession: 0
+        function calculateStats(results) {
+            const totalSessions = results.length;
+            let totalMinutes = 0;
+            let maxDuration = 0;
+            
+            results.forEach(session => {
+                const duration = session.duration || 0;
+                totalMinutes += duration;
+                maxDuration = Math.max(maxDuration, duration);
+            });
+            
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            const averageTime = totalSessions > 0 ? Math.round(totalMinutes / totalSessions) : 0;
+            
+            return {
+                totalSessions: totalSessions,
+                totalTime: `${hours}h ${minutes}m`,
+                averageTime: averageTime,
+                longestSession: maxDuration,
+                totalMinutes: totalMinutes
             };
         }
-        const duration = session.duration || 0;
-        subjectMap[subject].totalTime += duration;
-        subjectMap[subject].sessions += 1;
-        subjectMap[subject].maxSession = Math.max(subjectMap[subject].maxSession, duration);
-    });
-    
-    return Object.values(subjectMap);
-}
+        
         function displayChart(results) {
             const ctx = document.getElementById('durationChart').getContext('2d');
             const labels = results.map((_, i) => `Session ${i + 1}`);
@@ -549,4 +549,3 @@
 </body>
 
 </html>
-
