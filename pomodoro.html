@@ -324,29 +324,43 @@ cursor:not-allowed;
         // Initialize display
         startSession();
         
-        async function saveSessionData(duration) {
-            const subject = await getFirebaseItem('selectedSubject') || 'Not Specified';
-            const resultsKey = `results_Pomodoro Technique`;
-            let results = [];
-            
-            const existingData = await getFirebaseItem(resultsKey);
-            if (existingData) {
-                try {
-                    results = JSON.parse(existingData);
-                } catch (e) {
-                    results = [];
-                }
+      async function saveSessionData(duration) {
+    // Get the current task subject from todos
+    let subject = 'Not Specified';
+    const todosData = await getFirebaseItem('todos');
+    if (todosData) {
+        try {
+            const todos = JSON.parse(todosData);
+            const pendingTodo = todos.find(todo => !todo.completed);
+            if (pendingTodo) {
+                subject = pendingTodo.subject;
             }
-            
-            results.push({
-                duration: Math.round(duration),
-                subject: subject,
-                date: new Date().toLocaleDateString(),
-                time: new Date().toLocaleTimeString()
-            });
-            
-            await setFirebaseItem(resultsKey, JSON.stringify(results));
+        } catch (e) {
+            subject = 'Not Specified';
         }
+    }
+    
+    const resultsKey = `results_Pomodoro Technique`;
+    let results = [];
+    
+    const existingData = await getFirebaseItem(resultsKey);
+    if (existingData) {
+        try {
+            results = JSON.parse(existingData);
+        } catch (e) {
+            results = [];
+        }
+    }
+    
+    results.push({
+        duration: Math.round(duration),
+        subject: subject,
+        date: new Date().toLocaleDateString(),
+        time: new Date().toLocaleTimeString()
+    });
+    
+    await setFirebaseItem(resultsKey, JSON.stringify(results));
+}
             })();
           } else {
             window.location.href = 'signin.html';
@@ -355,3 +369,4 @@ cursor:not-allowed;
     </script>
 </body>
 </html>
+
